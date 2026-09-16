@@ -46,7 +46,11 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 TAVILY_API_KEY=your_tavily_api_key
 ```
 
-Create the database schema using `sql/poros.sql`. Never reuse the original class team's shared database or credentials.
+Use Node.js 22 and a separate Supabase project for this prototype. Set DATABASE_URL to that project's PostgreSQL connection string. Create a storage bucket named `resumes`; the current upload implementation uses public object URLs, so use synthetic demonstration PDFs only.
+
+Run `sql/poros.sql` in the new project's SQL editor to initialize the schema. This script DROPS existing Poros tables; run it only against an empty, disposable development database. It is not an upgrade migration.
+
+For a local PostgreSQL database, set `DB_SSL=false`; Supabase storage credentials are still required for uploads. Never reuse the original class team's shared database or credentials.
 
 ### 3. Run and verify
 
@@ -59,11 +63,13 @@ Open `http://localhost:3000/health` to verify the service.
 
 ## Security notes
 
-- All user-data and AI routes require a valid JWT.
+- AI routes require a valid JWT. The prototype has not received a comprehensive security audit.
 - Passwords are hashed before storage.
 - Uploads are limited to PDF files.
 - Secret files and uploaded documents are excluded by `.gitignore`.
 - Production deployments should restrict CORS to approved origins.
+- Resume storage currently returns public URLs. Private storage and signed downloads are required before using real personal documents.
+- AI routes need deployment-level rate limiting and provider spending limits before public operation.
 
 ## Related repositories
 
