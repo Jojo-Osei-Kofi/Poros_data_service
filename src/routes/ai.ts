@@ -135,4 +135,56 @@ router.post('/search', asyncHandler(async (req: AuthRequest, res: Response) => {
   res.json({ results: data.results || [], query: data.query || query });
 }));
 
+router.post('/company-profile', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const { companyName } = req.body as { companyName?: string };
+
+  if (!apiKey) {
+    throw new AppError('Company enrichment is not configured', 503);
+  }
+
+  if (!companyName) {
+    throw new AppError('Company name is required', 400);
+  }
+
+  const prompt = `Research ${companyName} for a student preparing an internship application. Return only valid JSON with this exact structure:
+{"name":"","industry":"","logo":"","companyInfo":{"size":"","culture":[],"benefits":[],"interviewProcess":[]},"applicationTimeline":{"internship":"","fullTime":"","contractor":"","coop":""},"preparationChecklist":[{"id":"1","title":"","description":"","completed":false,"category":"Portfolio"}]}
+
+Use cautious language for facts that may change. Do not invent event dates, URLs, benefits, hiring timelines, or interview steps. Checklist categories must be Portfolio, Interview Prep, Culture Study, or Technical Skills.`;
+
+  const upstream = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+
+  const data = await upstream.json() as {
+    content?: Array<{ text?: string }>;
+    error?: { message?: string };
+  };
+
+  if (!upstream.ok) {
+    throw new AppError(data.error?.message || 'Company enrichment request failed', upstream.status);
+  }
+
+  const text = data.content?.[0]?.text;
+  if (!text) {
+    throw new AppError('AI provider returned an empty response', 502);
+  }
+
+  try {
+    res.json(JSON.parse(text.trim()));
+  } catch {
+    throw new AppError('AI provider returned invalid JSON', 502);
+  }
+}));
+
 export default router;
